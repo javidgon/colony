@@ -2,6 +2,39 @@ import random
 from datetime import datetime
 
 
+class Building(object):
+    # Types
+    WAREHOUSE = 0
+    FUEL_TANK = 1
+    FACTORY = 2
+    REFINERY = 3
+    ARMERY = 4
+    
+    TYPES_NAME = ['Warehouse', 'Fuel Tank', 'Refinery', 'Armery']
+    TYPES_CAPACITY = [1000, 1000, 0, 0]
+    TYPES_COST = [220, 200, 150, 150]
+    MAX_STORAGE = 1000
+
+    def __init__(self, building_type):
+        self.building_id = 'BU{}'.format(random.randrange(0, 5000))
+        self.building_type = building_type
+        self.current_storage = 0
+    
+    def get_space_left(self):
+        return self.MAX_STORAGE - self.current_storage
+
+    def store_resource(self, amount):
+        if self.MAX_STORAGE < self.current_storage + amount:
+            return -1
+        else:
+            self.current_storage += amount
+        return self.current_storage
+
+    def __str__(self):
+        return '\t{} {} | Space available: {}/{}'.format(
+            self.TYPES_NAME[self.building_type], self.building_id, self.current_storage, self.MAX_STORAGE)
+
+
 class Robot(object):
     # Types
     STEEL = 0
@@ -33,7 +66,6 @@ class Robot(object):
         self.status = self.ACTIVE
         # (status, starting time, upgrade_level)
         self.status_intervals = []
-        self.working_time_per_upgrade = []
 
     # Change to "get_num..."
     def num_seconds_active_per_interval(self):
@@ -63,13 +95,10 @@ class Robot(object):
         num_seconds_active_per_interval = self.num_seconds_active_per_interval()
         total_extracted = 0
         for idx, status in enumerate(self.status_intervals):
-            upgrade_level = status[2]
-            try:
+            if status[0] == self.ACTIVE:
+                upgrade_level = status[2]
                 total_extracted += (num_seconds_active_per_interval[idx] * 
                     self.TYPES_EXTRACTION_RATE[self.robot_type] * self.UPGRADE_MULTIPLIER[upgrade_level])
-        
-            except:
-                import pdb; pdb.set_trace()
         return total_extracted
 
     def discovered_since_last_update(self):
@@ -82,23 +111,14 @@ class Robot(object):
         num_seconds_active_per_interval = self.num_seconds_active_per_interval()
         exploration_points = 0
         for idx, status in enumerate(self.status_intervals):
-            upgrade_level = status[2]
-            exploration_points += num_seconds_active_per_interval[idx] * self.UPGRADE_MULTIPLIER[upgrade_level]
-        
+            if status[0] == self.ACTIVE:
+                upgrade_level = status[2]
+                exploration_points += num_seconds_active_per_interval[idx] * self.UPGRADE_MULTIPLIER[upgrade_level]
+
         return exploration_points
     
     def upgrade(self):
-        if self.status != self.ACTIVE:
-            raise Exception('You cannot Upgrade a robot with status: {}'.format(self.status))
-
-        if self.upgrade_level < len(self.UPGRADE_MULTIPLIER) - 1:
-            working_time_previous_levels = 0
-            for level in range(self.upgrade_level):
-                working_time_previous_levels += self.working_time_per_upgrade[level]
-            self.working_time_per_upgrade.append(self.num_seconds_active() - working_time_previous_levels)
-            self.upgrade_level += 1
-        else:
-            raise Exception('Max Upgrade level reached.')
+        self.upgrade_level += 1
 
     def __str__(self):
         if self.robot_type == self.STEEL or self.robot_type == self.FUEL: 
@@ -119,6 +139,7 @@ class Robot(object):
                 self.num_seconds_active())
         return res + ' ({})'.format(self.STATUS_NAME[self.status])
 
+
 class Planet(object):
     DESERT = 0
     JUNGLE = 1
@@ -127,10 +148,12 @@ class Planet(object):
     TYPES_NAME = ['Desert', 'Jungle', 'Frozen', 'Rocky']
 
     def __init__(self):
-        self.planet_id = 'UH{}'.format(random.randrange(4000, 30000))
+        self.planet_id = 'PL{}'.format(random.randrange(4000, 30000))
         self.planet_type = random.randrange(0, len(self.TYPES_NAME))
         self.properties = self.planet_factory()
         self.discovered_resources = []
+        self.robots = []
+        self.buildings = []
         # This is going to be the only resource uncove at the beginning.
         self.uncover_resource()
     
@@ -147,31 +170,31 @@ class Planet(object):
     def planet_factory(self):
         if self.planet_type == self.DESERT:
             oxigen = random.randrange(20, 40)
-            fuel = random.randrange(60, 100)
+            fuel = random.randrange(600, 1000)
             water = random.randrange(5, 20)
             danger = random.randrange(15, 60)
-            mineral_steel = random.randrange(30, 50)
+            mineral_steel = random.randrange(300, 500)
 
         elif self.planet_type == self.JUNGLE:
             oxigen = random.randrange(80, 100)
-            fuel = random.randrange(20, 60)
+            fuel = random.randrange(200, 600)
             water = random.randrange(60, 90)
             danger = random.randrange(60, 90)
-            mineral_steel = random.randrange(15, 30)
+            mineral_steel = random.randrange(150, 300)
 
         elif self.planet_type == self.FROZEN:
             oxigen = random.randrange(20, 40)
-            fuel = random.randrange(60, 100)
+            fuel = random.randrange(600, 1000)
             water = random.randrange(50, 70)
             danger = random.randrange(15, 30)
-            mineral_steel = random.randrange(30, 50)
+            mineral_steel = random.randrange(300, 500)
 
         elif self.planet_type == self.ROCKY:
             oxigen = random.randrange(20, 40)
-            fuel = random.randrange(40, 60)
+            fuel = random.randrange(400, 600)
             water = random.randrange(5, 20)
             danger = random.randrange(15, 30)
-            mineral_steel = random.randrange(60, 90)
+            mineral_steel = random.randrange(600, 900)
 
         return {
             # ADD Temperature
@@ -183,3 +206,7 @@ class Planet(object):
                 'steel': mineral_steel
             }
         }
+    
+    def __str__(self):
+        return '\tPlanet {} ({}) | Properties: {}'.format(
+            self.planet_id, self.TYPES_NAME[self.planet_type], self.properties)
